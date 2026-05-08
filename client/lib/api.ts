@@ -1,4 +1,11 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+export const FILE_BASE = API_BASE.replace(/\/api$/, "");
+
+export function resolveFileUrl(fileUrl: string): string {
+  if (!fileUrl) return "";
+  if (fileUrl.startsWith("http://") || fileUrl.startsWith("https://")) return fileUrl;
+  return `${FILE_BASE}${fileUrl.startsWith("/") ? "" : "/"}${fileUrl}`;
+}
 
 /**
  * Upload a PDF file to the backend
@@ -137,6 +144,8 @@ export interface UploadResponse {
     filename: string;
     totalPages: number;
     totalChunks: number;
+    fileUrl: string;
+    mimeType: string;
   };
   message: string;
 }
@@ -165,6 +174,8 @@ export interface DocumentInfo {
   totalPages: number;
   totalChunks: number;
   fileSize: number;
+  fileUrl: string;
+  mimeType: string;
 }
 
 export interface DocumentsResponse {

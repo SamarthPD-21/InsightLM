@@ -2,7 +2,7 @@
 
 import React, { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
-import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, Sparkles } from "lucide-react";
+import { Upload, FileText, CheckCircle2, AlertCircle, Sparkles } from "lucide-react";
 import { uploadDocument, type UploadResponse } from "@/lib/api";
 
 interface FileUploadProps {
@@ -43,13 +43,19 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
       setSuccess(null);
       setProgress(10);
       setFileMeta({ name: file.name, size: file.size });
+      const startedAt = Date.now();
+      const minimumVisibleDurationMs = 6000;
+      let progressInterval: ReturnType<typeof setInterval> | null = null;
 
       try {
         // Simulate progress stages based on typical RAG pipeline timing
-        const progressInterval = setInterval(() => {
+        progressInterval = setInterval(() => {
           setProgress((prev) => {
             if (prev >= 85) {
-              clearInterval(progressInterval);
+              if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+              }
               return 85;
             }
             return prev + Math.random() * 10;
@@ -58,22 +64,35 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
 
         const response = await uploadDocument(file);
 
-        clearInterval(progressInterval);
+        const elapsed = Date.now() - startedAt;
+        const remaining = Math.max(0, minimumVisibleDurationMs - elapsed);
+        if (remaining > 0) {
+          await new Promise((resolve) => setTimeout(resolve, remaining));
+        }
+
+        if (progressInterval) {
+          clearInterval(progressInterval);
+          progressInterval = null;
+        }
         setProgress(100);
         setSuccess(response.message);
-        onUploadSuccess(response);
+        setUploading(false);
 
-        // Reset after delay
+        // Give the success state a brief moment before switching to chat.
         setTimeout(() => {
           setProgress(0);
           setSuccess(null);
           setFileMeta(null);
-        }, 3000);
+          onUploadSuccess(response);
+        }, 700);
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : "Upload failed. Please try again.";
         setError(errorMessage);
         setProgress(0);
         setFileMeta(null);
+        if (progressInterval) {
+          clearInterval(progressInterval);
+        }
       } finally {
         setUploading(false);
       }
@@ -125,9 +144,15 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
         <div style={{ position: "relative", zIndex: 1 }}>
           {uploading ? (
             <div className="animate-fade-in">
-              <div style={{ position: "relative", display: "inline-block", marginBottom: "16px" }}>
-                <Loader2 size={56} style={{ color: "var(--accent-primary)", animation: "spin 1.5s linear infinite" }} />
-                <Sparkles size={24} style={{ position: "absolute", top: "-10px", right: "-10px", color: "var(--accent-light)", animation: "float 2s infinite" }} />
+              <div className="upload-loader" aria-hidden="true">
+                <div className="upload-loader-ring" />
+                <div className="upload-loader-core">
+                  <Sparkles size={22} />
+                </div>
+              </div>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
+                <span className="badge badge-accent">Processing</span>
+                <span style={{ color: "var(--text-muted)", fontSize: "12px" }}>Preparing your file</span>
               </div>
             </div>
           ) : success ? (
@@ -159,18 +184,18 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
             }}
           >
             {uploading
-              ? "Processing your document..."
+              ? "Preparing your file..."
               : success
-              ? "Upload complete!"
+              ? "Ready to chat"
               : isDragActive
-              ? "Drop it like it's hot!"
-              : "Drag & drop your document here"}
+              ? "Drop your file here"
+              : "Drag and drop your file"}
           </h3>
 
           {!uploading && !success && (
             <>
               <p style={{ color: "var(--text-muted)", fontSize: "14px", marginBottom: "16px" }}>
-                or click to browse your files
+                or click to browse
               </p>
               <div style={{ display: "flex", gap: "8px", justifyContent: "center", flexWrap: "wrap" }}>
                 <span className="badge badge-accent"><FileText size={12} /> PDF</span>
@@ -215,27 +240,25 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
               {progress > 0 && !success && (
                 <div style={{ marginTop: "16px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                    <span style={{ fontSize: "13px", color: "var(--text-secondary)", fontWeight: 500 }} className="animate-pulse">
+                    <span style={{ fontSize: "13px", color: "var(--text-secondary)", fontWeight: 500 }}>
                       {progress < 30
-                        ? "📄 Reading document..."
+                        ? "Reading file"
                         : progress < 60
-                        ? "✂️ Chunking text data..."
+                        ? "Chunking content"
                         : progress < 90
-                        ? "🧠 Generating vector embeddings..."
-                        : "💾 Saving to Qdrant..."}
+                        ? "Creating embeddings"
+                        : "Saving index"}
                     </span>
                     <span style={{ fontSize: "13px", color: "var(--accent-light)", fontWeight: 600 }}>
                       {Math.round(progress)}%
                     </span>
                   </div>
-                  <div className="progress-bar" style={{ height: "6px", background: "rgba(255,255,255,0.05)" }}>
+                  <div className="progress-bar progress-bar-loading">
                     <div
-                      className="progress-bar-fill"
+                      className="progress-bar-fill progress-bar-fill-loading"
                       style={{
                         width: `${progress}%`,
-                        background: "var(--gradient-primary)",
-                        boxShadow: "0 0 10px rgba(124, 58, 237, 0.5)",
-                        transition: "width 0.3s ease-out"
+                        transition: "width 0.25s ease-out"
                       }}
                     />
                   </div>

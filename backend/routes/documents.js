@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { documentStore } from "./upload.js";
 import { deleteDocumentVectors } from "../services/embeddingService.js";
+import { existsSync, unlinkSync } from "fs";
 
 const router = Router();
 
@@ -33,6 +34,14 @@ router.delete("/:id", async (req, res) => {
 
     // Delete vectors from Qdrant
     await deleteDocumentVectors(id);
+
+    if (doc?.filePath && existsSync(doc.filePath)) {
+      try {
+        unlinkSync(doc.filePath);
+      } catch (cleanupError) {
+        console.warn("Could not delete uploaded file:", cleanupError.message);
+      }
+    }
 
     // Remove from store
     documentStore.delete(id);

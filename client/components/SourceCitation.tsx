@@ -6,9 +6,10 @@ import { type Source } from "@/lib/api";
 
 interface SourceCitationProps {
   sources: Source[];
+  onSelectSource?: (pageNumber: number) => void;
 }
 
-export default function SourceCitation({ sources }: SourceCitationProps) {
+export default function SourceCitation({ sources, onSelectSource }: SourceCitationProps) {
   const [expanded, setExpanded] = useState(false);
 
   if (!sources || sources.length === 0) return null;
@@ -18,9 +19,9 @@ export default function SourceCitation({ sources }: SourceCitationProps) {
       <button
         onClick={() => setExpanded(!expanded)}
         style={{
-          display: "flex", alignItems: "center", gap: "6px",
-          background: "none", border: "none", color: "var(--accent-light)",
-          fontSize: "12px", fontWeight: 600, cursor: "pointer", padding: 0,
+          display: "flex", alignItems: "center", gap: "8px",
+          background: "rgba(124, 58, 237, 0.08)", border: "1px solid rgba(124, 58, 237, 0.16)", color: "var(--accent-light)",
+          fontSize: "12px", fontWeight: 600, cursor: "pointer", padding: "8px 10px", borderRadius: "999px",
           fontFamily: "'Inter', sans-serif",
         }}
       >
@@ -32,10 +33,25 @@ export default function SourceCitation({ sources }: SourceCitationProps) {
       {expanded && (
         <div className="animate-fade-in" style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "8px" }}>
           {sources.map((source, i) => (
-            <div key={i} style={{
-              padding: "10px 12px", background: "rgba(124, 58, 237, 0.06)",
-              borderRadius: "var(--radius-sm)", border: "1px solid rgba(124, 58, 237, 0.12)",
-            }}>
+            <button
+              key={i}
+              type="button"
+              onClick={() => {
+                const pageNumber = Number(source.pageNumber);
+                if (onSelectSource && Number.isFinite(pageNumber)) {
+                  onSelectSource(pageNumber);
+                }
+              }}
+              style={{
+                padding: "12px 12px",
+                background: "rgba(124, 58, 237, 0.06)",
+                borderRadius: "var(--radius-md)",
+                border: "1px solid rgba(124, 58, 237, 0.12)",
+                cursor: onSelectSource ? "pointer" : "default",
+                textAlign: "left",
+                width: "100%",
+              }}
+            >
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
                 <span className="badge badge-accent" style={{ fontSize: "11px", padding: "2px 8px" }}>
                   Page {source.pageNumber}
@@ -45,7 +61,7 @@ export default function SourceCitation({ sources }: SourceCitationProps) {
               <p style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: "1.5", margin: 0 }}>
                 {source.preview}
               </p>
-            </div>
+            </button>
           ))}
         </div>
       )}

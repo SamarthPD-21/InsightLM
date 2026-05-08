@@ -1,18 +1,28 @@
 "use client";
 
 import React from "react";
-import { FileText, Trash2, BookOpen, Clock, Layers } from "lucide-react";
+import { FileText, Trash2, BookOpen, Clock, Layers, Eye, EyeOff } from "lucide-react";
 import { type DocumentInfo, deleteDocument } from "@/lib/api";
 
 interface SidebarProps {
   documents: DocumentInfo[];
   activeDocId: string | null;
+  isViewerVisible: boolean;
   onSelectDoc: (docId: string) => void;
+  onToggleViewer: (docId: string) => void;
   onDocumentDeleted: (docId: string) => void;
   onNewUpload: () => void;
 }
 
-export default function Sidebar({ documents, activeDocId, onSelectDoc, onDocumentDeleted, onNewUpload }: SidebarProps) {
+export default function Sidebar({
+  documents,
+  activeDocId,
+  isViewerVisible,
+  onSelectDoc,
+  onToggleViewer,
+  onDocumentDeleted,
+  onNewUpload,
+}: SidebarProps) {
   const handleDelete = async (e: React.MouseEvent, docId: string) => {
     e.stopPropagation();
     if (!confirm("Delete this document and its embeddings?")) return;
@@ -36,11 +46,14 @@ export default function Sidebar({ documents, activeDocId, onSelectDoc, onDocumen
   };
 
   return (
-    <div style={{
-      width: "280px", height: "100vh", background: "var(--bg-secondary)",
-      borderRight: "1px solid var(--border)", display: "flex", flexDirection: "column",
-      flexShrink: 0,
-    }}>
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
       {/* Logo */}
       <div style={{ padding: "20px", borderBottom: "1px solid var(--border)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -52,10 +65,10 @@ export default function Sidebar({ documents, activeDocId, onSelectDoc, onDocumen
             <BookOpen size={20} color="white" />
           </div>
           <div>
-            <h1 style={{ fontSize: "16px", fontWeight: 700 }}>
-              <span className="gradient-text">Notebook</span>LM
+            <h1 className="brand-display" style={{ fontSize: "16px", fontWeight: 700 }}>
+              <span className="gradient-text">Insight</span>LM
             </h1>
-            <p style={{ fontSize: "11px", color: "var(--text-muted)" }}>RAG-Powered AI</p>
+            <p style={{ fontSize: "11px", color: "var(--text-muted)" }}>Document intelligence workspace</p>
           </div>
         </div>
       </div>
@@ -122,16 +135,67 @@ export default function Sidebar({ documents, activeDocId, onSelectDoc, onDocumen
                   {doc.totalPages} pages • {formatSize(doc.fileSize)}
                 </span>
               </div>
-              <button onClick={(e) => handleDelete(e, doc.id)} style={{
-                background: "none", border: "none", cursor: "pointer",
-                color: "var(--text-muted)", padding: "4px", borderRadius: "4px",
-                transition: "all 0.2s ease",
-              }}
-              onMouseOver={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--error)"; }}
-              onMouseOut={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--text-muted)"; }}
-              >
-                <Trash2 size={14} />
-              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleViewer(doc.id);
+                  }}
+                  aria-label={
+                    doc.id === activeDocId
+                      ? isViewerVisible
+                        ? "Hide viewer"
+                        : "Show viewer"
+                      : "Open in viewer"
+                  }
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: doc.id === activeDocId && isViewerVisible ? "var(--accent-light)" : "var(--text-muted)",
+                    padding: "4px",
+                    borderRadius: "6px",
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseOver={(e) => {
+                    (e.currentTarget as HTMLElement).style.color = "var(--text-primary)";
+                    (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
+                  }}
+                  onMouseOut={(e) => {
+                    (e.currentTarget as HTMLElement).style.color =
+                      doc.id === activeDocId && isViewerVisible ? "var(--accent-light)" : "var(--text-muted)";
+                    (e.currentTarget as HTMLElement).style.background = "transparent";
+                  }}
+                >
+                  {doc.id === activeDocId && isViewerVisible ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={(e) => handleDelete(e, doc.id)}
+                  aria-label="Delete document"
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "var(--text-muted)",
+                    padding: "4px",
+                    borderRadius: "6px",
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseOver={(e) => {
+                    (e.currentTarget as HTMLElement).style.color = "var(--error)";
+                    (e.currentTarget as HTMLElement).style.background = "var(--error-bg)";
+                  }}
+                  onMouseOut={(e) => {
+                    (e.currentTarget as HTMLElement).style.color = "var(--text-muted)";
+                    (e.currentTarget as HTMLElement).style.background = "transparent";
+                  }}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
             </div>
           </div>
         ))}
@@ -140,10 +204,10 @@ export default function Sidebar({ documents, activeDocId, onSelectDoc, onDocumen
       {/* Footer */}
       <div style={{ padding: "16px", borderTop: "1px solid var(--border)", textAlign: "center" }}>
         <p style={{ fontSize: "11px", color: "var(--text-muted)" }}>
-          Powered by RAG Pipeline
+          Powered by InsightLM
         </p>
         <p style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "2px" }}>
-          OpenAI • Qdrant • LangChain
+          Clean answers • Citations • Source-aware chat
         </p>
       </div>
     </div>

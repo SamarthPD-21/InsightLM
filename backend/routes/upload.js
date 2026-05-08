@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from "uuid";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { unlinkSync } from "fs";
-import { loadPDF } from "../services/pdfService.js";
+import { loadDocument } from "../services/pdfService.js";
 import { chunkDocuments } from "../utils/chunking.js";
 import { storeEmbeddings } from "../services/embeddingService.js";
 
@@ -50,13 +50,15 @@ router.post("/", upload.single("file"), async (req, res) => {
     const docId = uuidv4();
     const filename = req.file.originalname;
     const filePath = req.file.path;
+    const fileUrl = `/uploads/${req.file.filename}`;
+    const mimeType = req.file.mimetype;
 
     console.log(`\n📁 Processing: ${filename}`);
     console.log(`   Document ID: ${docId}`);
 
     // Step 1: Load PDF
     console.log("   Step 1/3: Loading PDF...");
-    const documents = await loadPDF(filePath);
+    const documents = await loadDocument(filePath, mimeType);
 
     // Step 2: Chunk documents
     console.log("   Step 2/3: Chunking documents...");
@@ -75,14 +77,10 @@ router.post("/", upload.single("file"), async (req, res) => {
       totalPages: documents.length,
       totalChunks: chunks.length,
       fileSize: req.file.size,
+      fileUrl,
+      mimeType,
+      filePath,
     });
-
-    // Clean up temporary file
-    try {
-      unlinkSync(filePath);
-    } catch (e) {
-      console.warn("Could not delete temp file:", e.message);
-    }
 
     console.log(`   ✅ Document processed successfully!\n`);
 
@@ -93,11 +91,20 @@ router.post("/", upload.single("file"), async (req, res) => {
         filename,
         totalPages: documents.length,
         totalChunks: chunks.length,
+        fileUrl,
+        mimeType,
       },
       message: `Document "${filename}" processed successfully. ${chunks.length} chunks indexed.`,
     });
   } catch (error) {
     console.error("Upload error:", error);
+    if (req.file?.path) {
+      try {
+        unlinkSync(req.file.path);
+      } catch {
+        // Ignore cleanup failures for temp uploads.
+      }
+    }
     res.status(500).json({
       error: "Failed to process document",
       message: error.message,

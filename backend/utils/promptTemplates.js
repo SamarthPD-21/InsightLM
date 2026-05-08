@@ -29,8 +29,11 @@ export function buildSystemPrompt(contextChunks) {
 4. When answering, **cite the source** by mentioning the page number(s).
    Example: "According to the document (Page 3), ..."
 5. Be concise, clear, and well-structured in your responses.
-6. Use markdown formatting for better readability (bullet points, bold, code blocks when appropriate).
-7. If multiple sources are relevant, synthesize them and cite all page numbers.
+6. Use clean markdown formatting that is easy to read on screen.
+7. Prefer short paragraphs, bullet points, and bold labels over dense blocks of text.
+8. If multiple sources are relevant, synthesize them and cite all page numbers.
+9. When the answer is detailed, start with a one-line summary, then a short structured breakdown.
+10. Avoid tables unless they materially improve readability.
 
 ## CONTEXT FROM DOCUMENT:
 ${formattedContext}

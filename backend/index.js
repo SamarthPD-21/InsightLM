@@ -4,7 +4,7 @@ import cors from "cors";
 import uploadRouter from "./routes/upload.js";
 import chatRouter from "./routes/chat.js";
 import documentsRouter from "./routes/documents.js";
-import { ensureUploadDir } from "./utils/fileUtils.js";
+import { ensureUploadDir, getUploadDir } from "./utils/fileUtils.js";
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -19,6 +19,9 @@ app.use(express.json());
 
 // Ensure uploads directory exists
 ensureUploadDir();
+
+// Serve uploaded documents for the in-app viewer
+app.use("/uploads", express.static(getUploadDir()));
 
 // Routes
 app.use("/api/upload", uploadRouter);

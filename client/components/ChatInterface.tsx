@@ -12,11 +12,13 @@ interface Message {
   content: string;
   sources?: Source[];
   timestamp: Date;
+  isStreaming?: boolean;
 }
 
 interface ChatInterfaceProps {
   docId: string;
   filename: string;
+  onSourceClick?: (pageNumber: number) => void;
 }
 
 const SUGGESTED_QUESTIONS = [
@@ -26,18 +28,17 @@ const SUGGESTED_QUESTIONS = [
   "Give me a detailed overview of the content.",
 ];
 
-export default function ChatInterface({ docId, filename }: ChatInterfaceProps) {
+export default function ChatInterface({ docId, filename, onSourceClick }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [streamingContent, setStreamingContent] = useState("");
-  const [streamingSources, setStreamingSources] = useState<Source[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const messageIdRef = useRef(0);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamingContent]);
+  }, [messages, isLoading]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -51,18 +52,33 @@ export default function ChatInterface({ docId, filename }: ChatInterfaceProps) {
     const question = questionText || input.trim();
     if (!question || isLoading) return;
 
+    const nextMessageId = () => {
+      messageIdRef.current += 1;
+      return `message-${messageIdRef.current}`;
+    };
+
+    const userMessageId = nextMessageId();
+    const assistantMessageId = nextMessageId();
+
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: userMessageId,
       role: "user",
       content: question,
       timestamp: new Date(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      role: "assistant",
+      content: "",
+      sources: [],
+      timestamp: new Date(),
+      isStreaming: true,
+    };
+
+    setMessages((prev) => [...prev, userMessage, assistantMessage]);
     setInput("");
     setIsLoading(true);
-    setStreamingContent("");
-    setStreamingSources([]);
 
     try {
       // Build chat history for context
@@ -80,38 +96,54 @@ export default function ChatInterface({ docId, filename }: ChatInterfaceProps) {
         chatHistory,
         (content) => {
           accumulatedContent += content;
-          setStreamingContent(accumulatedContent);
+          setMessages((prev) =>
+            prev.map((message) =>
+              message.id === assistantMessageId
+                ? { ...message, content: accumulatedContent }
+                : message
+            )
+          );
         },
         (sources) => {
           capturedSources = sources;
-          setStreamingSources(sources);
+          setMessages((prev) =>
+            prev.map((message) =>
+              message.id === assistantMessageId
+                ? { ...message, sources }
+                : message
+            )
+          );
         },
         () => {
-          // Done - add complete message
-          const assistantMessage: Message = {
-            id: (Date.now() + 1).toString(),
-            role: "assistant",
-            content: accumulatedContent,
-            sources: capturedSources,
-            timestamp: new Date(),
-          };
-          setMessages((prev) => [...prev, assistantMessage]);
-          setStreamingContent("");
-          setStreamingSources([]);
+          setMessages((prev) =>
+            prev.map((message) =>
+              message.id === assistantMessageId
+                ? {
+                    ...message,
+                    content: accumulatedContent,
+                    sources: capturedSources,
+                    isStreaming: false,
+                  }
+                : message
+            )
+          );
           setIsLoading(false);
         }
       );
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "An error occurred";
-      const errorMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: `❌ Error: ${errorMessage}. Please try again.`,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMsg]);
+      setMessages((prev) =>
+        prev.map((message) =>
+          message.id === assistantMessageId
+            ? {
+                ...message,
+                content: `Sorry, I could not complete that request. ${errorMessage}`,
+                isStreaming: false,
+              }
+            : message
+        )
+      );
       setIsLoading(false);
-      setStreamingContent("");
     }
   };
 
@@ -157,16 +189,17 @@ export default function ChatInterface({ docId, filename }: ChatInterfaceProps) {
           <BookOpen size={18} color="white" />
         </div>
         <div>
-          <h3 style={{ fontSize: "15px", fontWeight: 600 }}>
-            Chat with Document
+          <h3 className="panel-title" style={{ fontSize: "15px", fontWeight: 700 }}>
+            InsightLM chat
           </h3>
           <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "2px" }}>
             {filename}
           </p>
         </div>
-        <span className="badge badge-success" style={{ marginLeft: "auto" }}>
-          Active
-        </span>
+        <div style={{ marginLeft: "auto", display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <span className="badge badge-success">Active</span>
+          <span className="badge badge-accent">Grounded</span>
+        </div>
       </div>
 
       {/* Messages Area */}
@@ -218,7 +251,7 @@ export default function ChatInterface({ docId, filename }: ChatInterfaceProps) {
                 marginBottom: "8px",
               }}
             >
-              Ask anything about your document
+              Ask InsightLM anything about your document
             </h3>
             <p
               style={{
@@ -251,16 +284,17 @@ export default function ChatInterface({ docId, filename }: ChatInterfaceProps) {
                   style={{
                     animationDelay: `${i * 0.1}s`,
                     opacity: 0,
-                    background: "var(--bg-card)",
+                    background: "linear-gradient(180deg, rgba(22, 22, 42, 0.96), rgba(17, 17, 29, 0.96))",
                     border: "1px solid var(--border)",
-                    borderRadius: "var(--radius-md)",
-                    padding: "12px 16px",
+                    borderRadius: "var(--radius-lg)",
+                    padding: "14px 16px",
                     color: "var(--text-secondary)",
                     fontSize: "13px",
                     textAlign: "left",
                     cursor: "pointer",
                     transition: "all 0.2s ease",
                     lineHeight: "1.4",
+                    boxShadow: "var(--shadow-sm)",
                   }}
                   onMouseOver={(e) => {
                     (e.target as HTMLElement).style.borderColor = "var(--border-accent)";
@@ -325,17 +359,20 @@ export default function ChatInterface({ docId, filename }: ChatInterfaceProps) {
                 background:
                   message.role === "user"
                     ? "var(--gradient-primary)"
-                    : "var(--bg-card)",
+                    : "linear-gradient(180deg, rgba(22, 22, 42, 0.98), rgba(16, 16, 28, 0.98))",
                 border:
                   message.role === "user"
                     ? "none"
                     : "1px solid var(--border)",
                 color: "var(--text-primary)",
+                position: "relative",
               }}
+              className={`message-bubble ${message.role === "user" ? "user-bubble" : "assistant-bubble"}`}
             >
               {message.role === "assistant" ? (
                 <div className="markdown-content">
-                  <ReactMarkdown>{message.content}</ReactMarkdown>
+                  <ReactMarkdown>{message.content || ""}</ReactMarkdown>
+                  {message.isStreaming && <span className="streaming-cursor" aria-hidden="true" />}
                 </div>
               ) : (
                 <p style={{ fontSize: "14px", lineHeight: "1.6" }}>
@@ -345,75 +382,11 @@ export default function ChatInterface({ docId, filename }: ChatInterfaceProps) {
 
               {/* Source Citations */}
               {message.sources && message.sources.length > 0 && (
-                <SourceCitation sources={message.sources} />
+                <SourceCitation sources={message.sources} onSelectSource={onSourceClick} />
               )}
             </div>
           </div>
         ))}
-
-        {/* Streaming response */}
-        {isLoading && (
-          <div
-            className="animate-slide-left"
-            style={{
-              display: "flex",
-              gap: "12px",
-            }}
-          >
-            <div
-              style={{
-                width: "32px",
-                height: "32px",
-                borderRadius: "var(--radius-sm)",
-                background: "var(--gradient-primary)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-                marginTop: "4px",
-              }}
-            >
-              <Sparkles size={16} color="white" />
-            </div>
-
-            <div
-              style={{
-                maxWidth: "75%",
-                padding: "16px 20px",
-                borderRadius: "var(--radius-lg) var(--radius-lg) var(--radius-lg) 4px",
-                background: "var(--bg-card)",
-                border: "1px solid var(--border)",
-              }}
-            >
-              {streamingContent ? (
-                <div className="markdown-content">
-                  <ReactMarkdown>{streamingContent}</ReactMarkdown>
-                  <span
-                    style={{
-                      display: "inline-block",
-                      width: "8px",
-                      height: "16px",
-                      background: "var(--accent-primary)",
-                      marginLeft: "2px",
-                      animation: "typing 1s infinite",
-                      borderRadius: "1px",
-                    }}
-                  />
-                </div>
-              ) : (
-                <div className="typing-indicator">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
-              )}
-
-              {streamingSources.length > 0 && (
-                <SourceCitation sources={streamingSources} />
-              )}
-            </div>
-          </div>
-        )}
 
         <div ref={messagesEndRef} />
       </div>
@@ -442,7 +415,6 @@ export default function ChatInterface({ docId, filename }: ChatInterfaceProps) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask a question about your document..."
             className="input-field"
             rows={1}
             disabled={isLoading}
@@ -451,6 +423,7 @@ export default function ChatInterface({ docId, filename }: ChatInterfaceProps) {
               minHeight: "44px",
               maxHeight: "120px",
             }}
+            placeholder="Ask InsightLM about this document..."
           />
           <button
             id="send-button"
@@ -482,7 +455,7 @@ export default function ChatInterface({ docId, filename }: ChatInterfaceProps) {
             marginTop: "10px",
           }}
         >
-          Answers are generated from your uploaded document only • Not from general AI knowledge
+          Answers are generated from your uploaded document only • formatted for easier reading
         </p>
       </div>
     </div>
