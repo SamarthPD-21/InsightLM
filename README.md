@@ -1,144 +1,128 @@
-# NotebookLM RAG Clone
+# InsightLM
 
-A full-stack RAG (Retrieval-Augmented Generation) powered application inspired by Google NotebookLM. Upload any PDF document and have an AI-powered conversation with it — answers are grounded strictly in the document content with source citations.
+InsightLM is a document intelligence workspace: upload PDFs or text files, chat with grounded answers, and jump to cited pages in an in-app document viewer.
 
-## 🏗️ Architecture
+## What you get
 
-```
-Frontend (Next.js 16 + Tailwind CSS)
-        ↓
-Backend API (Node.js + Express)
-        ↓
-RAG Pipeline:
-  1. PDF Upload → multer
-  2. Parse → LangChain PDFLoader
-  3. Chunk → RecursiveCharacterTextSplitter (800 chars, 150 overlap)
-  4. Embed → OpenAI text-embedding-3-large
-  5. Store → Qdrant Vector Database
-  6. Retrieve → Similarity Search (Top-K)
-  7. Generate → GPT-4.1-mini with grounded prompt
-  8. Return → Answer + Source Citations
-```
+- **Grounded chat with citations** (page-level sources)
+- **Streaming responses** (SSE “letter-by-letter” feel)
+- **Side-by-side workspace**: chat (left) + document preview (right)
+- **Clickable citations**: jump the viewer to the referenced page
+- **Multi-document sidebar** (collapsible) + per-file viewer toggle
+- **PDF + TXT support**
 
-## 📁 Project Structure
+## Architecture
 
 ```
-project/
-├── backend/
-│   ├── index.js              # Express server entry point
-│   ├── routes/
-│   │   ├── upload.js          # PDF upload & ingestion pipeline
-│   │   ├── chat.js            # RAG query endpoint (standard + streaming)
-│   │   └── documents.js       # Document management (list, delete)
-│   ├── services/
-│   │   ├── pdfService.js      # PDF parsing with LangChain
-│   │   ├── embeddingService.js # Embedding generation & Qdrant storage
-│   │   └── ragService.js      # Full RAG pipeline (retrieve → prompt → generate)
-│   └── utils/
-│       ├── chunking.js        # Chunking strategy (documented)
-│       ├── promptTemplates.js # Grounded generation prompts
-│       └── fileUtils.js       # File system utilities
-├── client/
-│   ├── app/
-│   │   ├── page.tsx           # Main application page
-│   │   ├── layout.tsx         # Root layout with SEO
-│   │   └── globals.css        # Design system & animations
-│   ├── components/
-│   │   ├── FileUpload.tsx     # Drag & drop upload with progress
-│   │   ├── ChatInterface.tsx  # Chat UI with streaming & suggestions
-│   │   ├── Sidebar.tsx        # Document management sidebar
-│   │   └── SourceCitation.tsx # Source citation display
-│   └── lib/
-│       └── api.ts             # API client with TypeScript types
+Next.js client (React 19)
+        └─ streams chat + renders markdown + document viewer
+
+Express API
+        ├─ /api/upload     (multer → parse → chunk → embed → store)
+        ├─ /api/chat       (RAG retrieve → grounded prompt → stream response)
+        ├─ /api/documents  (list/delete)
+        └─ /uploads/*      (serves original uploaded files for the viewer)
+
+Qdrant
+        └─ stores embeddings for retrieval
+
+Hugging Face Inference
+        ├─ embeddings: BAAI/bge-large-en-v1.5
+        └─ chat model: Qwen/Qwen2.5-7B-Instruct
 ```
 
-## 🚀 Getting Started
+## Project structure
+
+```
+backend/
+        index.js
+        routes/ (upload, chat, documents)
+        services/ (ragService, embeddingService, pdfService)
+        utils/ (chunking, promptTemplates, fileUtils)
+
+client/
+        app/ (layout, page, globals)
+        components/ (Sidebar, FileUpload, ChatInterface, DocumentViewer, SourceCitation)
+        lib/ (api client + types)
+```
+
+## Getting started (local)
 
 ### Prerequisites
 
 - Node.js 18+
 - Docker (for Qdrant)
-- OpenAI API Key
+- A Hugging Face token with Inference access
 
-### 1. Start Qdrant
+### 1) Start Qdrant
 
 ```bash
 docker run -p 6333:6333 qdrant/qdrant
 ```
 
-### 2. Setup Backend
+### 2) Backend
 
 ```bash
 cd backend
 npm install
-cp .env.example .env
-# Edit .env and add your OpenAI API key
+
+# Create backend/.env
+cat > .env <<'EOF'
+HF_TOKEN=YOUR_HF_TOKEN
+QDRANT_URL=http://localhost:6333
+QDRANT_COLLECTION_NAME=insightlm-docs
+FRONTEND_URL=http://localhost:3000
+EOF
+
 npm run dev
 ```
 
-### 3. Setup Frontend
+Backend runs at `http://localhost:8000`.
+
+### 3) Client
 
 ```bash
 cd client
 npm install
+
+# Optional (defaults to http://localhost:8000/api)
+export NEXT_PUBLIC_API_URL=http://localhost:8000/api
+
 npm run dev
 ```
 
-The app will be available at http://localhost:3000
+Open `http://localhost:3000`.
 
-## 🔧 Environment Variables
+## Environment variables
 
-### Backend (.env)
+### Backend (`backend/.env`)
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `OPENAI_API_KEY` | Your OpenAI API key | Required |
-| `QDRANT_URL` | Qdrant server URL | `http://localhost:6333` |
-| `QDRANT_COLLECTION_NAME` | Qdrant collection name | `notebooklm-docs` |
-| `PORT` | Backend server port | `8000` |
-| `FRONTEND_URL` | Frontend URL for CORS | `http://localhost:3000` |
+| Variable | Required | Description |
+|---|---:|---|
+| `HF_TOKEN` | ✅ | Hugging Face token used for embeddings + chat inference |
+| `QDRANT_URL` | ✅ | Qdrant URL (local default `http://localhost:6333`) |
+| `QDRANT_API_KEY` | ❌ | Set if using Qdrant Cloud / protected instance |
+| `QDRANT_COLLECTION_NAME` | ❌ | Collection name (default `notebooklm-docs` in code) |
+| `PORT` | ❌ | Express port (default `8000`) |
+| `FRONTEND_URL` | ❌ | CORS origin (default `http://localhost:3000`) |
 
-## 📋 Chunking Strategy
+### Client
 
-**Strategy**: `RecursiveCharacterTextSplitter`
+| Variable | Required | Description |
+|---|---:|---|
+| `NEXT_PUBLIC_API_URL` | ❌ | Backend API base (default `http://localhost:8000/api`) |
 
-| Parameter | Value | Rationale |
-|-----------|-------|-----------|
-| `chunkSize` | 800 | Balance between retrieval accuracy and context |
-| `chunkOverlap` | 150 | Prevents information loss at boundaries |
-| `separators` | `["\n\n", "\n", ". ", " ", ""]` | Natural boundary splitting |
+## Notes / limitations
 
-The splitter tries to split on natural boundaries (paragraphs → sentences → words) before falling back to character-level splits. Overlap ensures sentences spanning chunk boundaries are captured in both adjacent chunks.
+- The backend uses an **in-memory document store**. If the server restarts, the document list resets (Qdrant vectors and uploaded files may still exist).
+- Uploaded source files are served from `backend/uploads` via `GET /uploads/*` so the in-app viewer can render them.
 
-## 🔑 Key Features
+## API (quick reference)
 
-- **Full RAG Pipeline**: Document → Chunk → Embed → Store → Retrieve → Generate
-- **Grounded Answers**: LLM answers ONLY from document content
-- **Source Citations**: Page numbers cited for every answer
-- **Streaming Responses**: Real-time token streaming for better UX
-- **Multi-Document Support**: Upload and switch between multiple PDFs
-- **"Not Found" Responses**: Explicitly states when info isn't in the document
-- **Dark Mode UI**: Premium glassmorphism design with animations
-- **Suggested Questions**: Pre-built questions to get started quickly
-
-## 📡 API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/upload` | Upload & process a PDF document |
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `POST` | `/api/upload` | Upload + index PDF/TXT |
 | `POST` | `/api/chat` | Ask a question (supports streaming) |
-| `GET` | `/api/documents` | List all uploaded documents |
-| `DELETE` | `/api/documents/:id` | Delete a document |
+| `GET` | `/api/documents` | List documents |
+| `DELETE` | `/api/documents/:id` | Delete document (vectors + file) |
 | `GET` | `/api/health` | Health check |
-
-## 🛠️ Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js 16, Tailwind CSS 4, TypeScript |
-| Backend | Node.js, Express.js |
-| LLM | OpenAI GPT-4.1-mini |
-| Embeddings | text-embedding-3-large |
-| Vector DB | Qdrant |
-| PDF Parsing | LangChain PDFLoader |
-| Chunking | LangChain RecursiveCharacterTextSplitter |
