@@ -41,34 +41,30 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
       setUploading(true);
       setError(null);
       setSuccess(null);
-      setProgress(10);
+      setProgress(0);
       setFileMeta({ name: file.name, size: file.size });
-      const startedAt = Date.now();
-      const minimumVisibleDurationMs = 6000;
       let progressInterval: ReturnType<typeof setInterval> | null = null;
 
       try {
         // Simulate progress stages based on typical RAG pipeline timing
         progressInterval = setInterval(() => {
           setProgress((prev) => {
-            if (prev >= 85) {
-              if (progressInterval) {
-                clearInterval(progressInterval);
-                progressInterval = null;
-              }
-              return 85;
+            if (prev >= 99) return prev;
+
+            let delta = 0.2 + Math.random() * 0.3;
+            if (prev < 70) {
+              delta = 1 + Math.random() * 0.8;
+            } else if (prev < 90) {
+              delta = 0.6 + Math.random() * 0.6;
+            } else if (prev < 98) {
+              delta = 0.2 + Math.random() * 0.4;
             }
-            return prev + Math.random() * 10;
+
+            return Math.min(99, prev + delta);
           });
-        }, 400);
+        }, 80);
 
         const response = await uploadDocument(file);
-
-        const elapsed = Date.now() - startedAt;
-        const remaining = Math.max(0, minimumVisibleDurationMs - elapsed);
-        if (remaining > 0) {
-          await new Promise((resolve) => setTimeout(resolve, remaining));
-        }
 
         if (progressInterval) {
           clearInterval(progressInterval);
@@ -147,12 +143,11 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
               <div className="upload-loader" aria-hidden="true">
                 <div className="upload-loader-ring" />
                 <div className="upload-loader-core">
-                  <Sparkles size={22} />
+                  <Sparkles size={22} className="animate-none" />
                 </div>
               </div>
               <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
                 <span className="badge badge-accent">Processing</span>
-                <span style={{ color: "var(--text-muted)", fontSize: "12px" }}>Preparing your file</span>
               </div>
             </div>
           ) : success ? (
