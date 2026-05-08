@@ -162,7 +162,7 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
               className="animate-fade-in"
             />
           ) : (
-            <div className="animate-float" style={{ display: "inline-block" }}>
+            <div style={{ display: "inline-block" }}>
               <Upload
                 size={56}
                 style={{

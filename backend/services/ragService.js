@@ -4,6 +4,7 @@ import { buildSystemPrompt } from "../utils/promptTemplates.js";
 
 const hf = new HfInference(process.env.HF_TOKEN);
 const MODEL = "Qwen/Qwen2.5-7B-Instruct";
+const DEFAULT_TOP_K = Number(process.env.RAG_TOP_K || 8);
 
 /**
  * Full RAG pipeline: retrieve → prompt → generate
@@ -14,7 +15,7 @@ const MODEL = "Qwen/Qwen2.5-7B-Instruct";
  */
 export async function ragQuery(question, docId = null, chatHistory = []) {
   // Step 1: Retrieve relevant chunks
-  const chunks = await retrieveChunks(question, 4, docId);
+  const chunks = await retrieveChunks(question, DEFAULT_TOP_K, docId);
 
   if (chunks.length === 0) {
     return {
@@ -78,7 +79,7 @@ export async function ragQuery(question, docId = null, chatHistory = []) {
  */
 export async function ragQueryStream(question, docId = null, chatHistory = [], res) {
   // Step 1: Retrieve relevant chunks
-  const chunks = await retrieveChunks(question, 4, docId);
+  const chunks = await retrieveChunks(question, DEFAULT_TOP_K, docId);
 
   if (chunks.length === 0) {
     res.write(`data: ${JSON.stringify({ type: "sources", sources: [] })}\n\n`);

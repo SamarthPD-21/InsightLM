@@ -80,6 +80,12 @@ export default function Home() {
     }
   };
 
+  const handleSourceClick = (pageNumber: number) => {
+    setSelectedPage(pageNumber);
+    setIsViewerVisible(true);
+    setView("chat");
+  };
+
   const activeDoc = documents.find((d) => d.id === activeDocId);
 
   return (
@@ -91,9 +97,7 @@ export default function Home() {
           <Sidebar
             documents={documents}
             activeDocId={activeDocId}
-            isViewerVisible={isViewerVisible}
             onSelectDoc={handleSelectDoc}
-            onToggleViewer={handleToggleViewer}
             onDocumentDeleted={handleDocDeleted}
             onNewUpload={() => setView("landing")}
           />
@@ -153,7 +157,9 @@ export default function Home() {
               <ChatInterface
                 docId={activeDoc.id}
                 filename={activeDoc.filename}
-                onSourceClick={setSelectedPage}
+                isViewerVisible={isViewerVisible}
+                onToggleViewer={() => handleToggleViewer(activeDoc.id)}
+                onSourceClick={handleSourceClick}
               />
             </section>
             <div className="viewer-pane" aria-hidden={!isViewerVisible}>

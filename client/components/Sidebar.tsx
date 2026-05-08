@@ -1,15 +1,13 @@
 "use client";
 
 import React from "react";
-import { FileText, Trash2, BookOpen, Clock, Layers, Eye, EyeOff } from "lucide-react";
+import { FileText, Trash2, BookOpen, Clock, Layers } from "lucide-react";
 import { type DocumentInfo, deleteDocument } from "@/lib/api";
 
 interface SidebarProps {
   documents: DocumentInfo[];
   activeDocId: string | null;
-  isViewerVisible: boolean;
   onSelectDoc: (docId: string) => void;
-  onToggleViewer: (docId: string) => void;
   onDocumentDeleted: (docId: string) => void;
   onNewUpload: () => void;
 }
@@ -17,9 +15,7 @@ interface SidebarProps {
 export default function Sidebar({
   documents,
   activeDocId,
-  isViewerVisible,
   onSelectDoc,
-  onToggleViewer,
   onDocumentDeleted,
   onNewUpload,
 }: SidebarProps) {
@@ -68,7 +64,6 @@ export default function Sidebar({
             <h1 className="brand-display" style={{ fontSize: "16px", fontWeight: 700 }}>
               <span className="gradient-text">Insight</span>LM
             </h1>
-            <p style={{ fontSize: "11px", color: "var(--text-muted)" }}>Document intelligence workspace</p>
           </div>
         </div>
       </div>
@@ -136,41 +131,6 @@ export default function Sidebar({
                 </span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onToggleViewer(doc.id);
-                  }}
-                  aria-label={
-                    doc.id === activeDocId
-                      ? isViewerVisible
-                        ? "Hide viewer"
-                        : "Show viewer"
-                      : "Open in viewer"
-                  }
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: doc.id === activeDocId && isViewerVisible ? "var(--accent-light)" : "var(--text-muted)",
-                    padding: "4px",
-                    borderRadius: "6px",
-                    transition: "all 0.2s ease",
-                  }}
-                  onMouseOver={(e) => {
-                    (e.currentTarget as HTMLElement).style.color = "var(--text-primary)";
-                    (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
-                  }}
-                  onMouseOut={(e) => {
-                    (e.currentTarget as HTMLElement).style.color =
-                      doc.id === activeDocId && isViewerVisible ? "var(--accent-light)" : "var(--text-muted)";
-                    (e.currentTarget as HTMLElement).style.background = "transparent";
-                  }}
-                >
-                  {doc.id === activeDocId && isViewerVisible ? <EyeOff size={14} /> : <Eye size={14} />}
-                </button>
-
                 <button
                   type="button"
                   onClick={(e) => handleDelete(e, doc.id)}

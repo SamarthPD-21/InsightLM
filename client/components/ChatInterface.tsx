@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
-import { Send, Loader2, BookOpen, Sparkles, MessageSquare } from "lucide-react";
+import { Send, Loader2, BookOpen, Sparkles, MessageSquare, Eye, EyeOff } from "lucide-react";
 import { sendMessageStream, type Source, type ChatMessage } from "@/lib/api";
 import SourceCitation from "./SourceCitation";
 
@@ -18,6 +18,8 @@ interface Message {
 interface ChatInterfaceProps {
   docId: string;
   filename: string;
+  isViewerVisible: boolean;
+  onToggleViewer: () => void;
   onSourceClick?: (pageNumber: number) => void;
 }
 
@@ -28,13 +30,26 @@ const SUGGESTED_QUESTIONS = [
   "Give me a detailed overview of the content.",
 ];
 
-export default function ChatInterface({ docId, filename, onSourceClick }: ChatInterfaceProps) {
+export default function ChatInterface({
+  docId,
+  filename,
+  isViewerVisible,
+  onToggleViewer,
+  onSourceClick,
+}: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messageIdRef = useRef(0);
+  const streamingMessageIdRef = useRef<string | null>(null);
+  const typingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pendingStreamRef = useRef("");
+  const displayedStreamRef = useRef("");
+  const fullStreamRef = useRef("");
+  const streamDoneRef = useRef(false);
+  const sourcesRef = useRef<Source[]>([]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -47,6 +62,80 @@ export default function ChatInterface({ docId, filename, onSourceClick }: ChatIn
       inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 120) + "px";
     }
   }, [input]);
+
+  useEffect(() => {
+    return () => {
+      if (typingTimerRef.current) {
+        clearInterval(typingTimerRef.current);
+        typingTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  const stopTypingTimer = () => {
+    if (typingTimerRef.current) {
+      clearInterval(typingTimerRef.current);
+      typingTimerRef.current = null;
+    }
+  };
+
+  const finalizeStream = () => {
+    const messageId = streamingMessageIdRef.current;
+    if (!messageId) return;
+
+    displayedStreamRef.current = fullStreamRef.current;
+    setMessages((prev) =>
+      prev.map((message) =>
+        message.id === messageId
+          ? {
+              ...message,
+              content: fullStreamRef.current,
+              sources: sourcesRef.current,
+              isStreaming: false,
+            }
+          : message
+      )
+    );
+
+    streamingMessageIdRef.current = null;
+    streamDoneRef.current = false;
+    pendingStreamRef.current = "";
+    stopTypingTimer();
+  };
+
+  const startTyping = () => {
+    if (typingTimerRef.current) return;
+
+    typingTimerRef.current = setInterval(() => {
+      const messageId = streamingMessageIdRef.current;
+      if (!messageId) {
+        stopTypingTimer();
+        return;
+      }
+
+      if (pendingStreamRef.current.length === 0) {
+        if (streamDoneRef.current) {
+          finalizeStream();
+        }
+        return;
+      }
+
+      const pending = pendingStreamRef.current;
+      const chunkSize = pending.length > 200 ? 3 : pending.length > 80 ? 2 : 1;
+      const nextChunk = pending.slice(0, chunkSize);
+
+      pendingStreamRef.current = pending.slice(chunkSize);
+      displayedStreamRef.current += nextChunk;
+
+      setMessages((prev) =>
+        prev.map((message) =>
+          message.id === messageId
+            ? { ...message, content: displayedStreamRef.current }
+            : message
+        )
+      );
+    }, 16);
+  };
 
   const handleSend = async (questionText?: string) => {
     const question = questionText || input.trim();
@@ -87,25 +176,24 @@ export default function ChatInterface({ docId, filename, onSourceClick }: ChatIn
         content: m.content,
       }));
 
-      let accumulatedContent = "";
-      let capturedSources: Source[] = [];
+      streamingMessageIdRef.current = assistantMessageId;
+      pendingStreamRef.current = "";
+      displayedStreamRef.current = "";
+      fullStreamRef.current = "";
+      streamDoneRef.current = false;
+      sourcesRef.current = [];
 
       await sendMessageStream(
         question,
         docId,
         chatHistory,
         (content) => {
-          accumulatedContent += content;
-          setMessages((prev) =>
-            prev.map((message) =>
-              message.id === assistantMessageId
-                ? { ...message, content: accumulatedContent }
-                : message
-            )
-          );
+          fullStreamRef.current += content;
+          pendingStreamRef.current += content;
+          startTyping();
         },
         (sources) => {
-          capturedSources = sources;
+          sourcesRef.current = sources;
           setMessages((prev) =>
             prev.map((message) =>
               message.id === assistantMessageId
@@ -115,22 +203,17 @@ export default function ChatInterface({ docId, filename, onSourceClick }: ChatIn
           );
         },
         () => {
-          setMessages((prev) =>
-            prev.map((message) =>
-              message.id === assistantMessageId
-                ? {
-                    ...message,
-                    content: accumulatedContent,
-                    sources: capturedSources,
-                    isStreaming: false,
-                  }
-                : message
-            )
-          );
+          streamDoneRef.current = true;
           setIsLoading(false);
+          startTyping();
         }
       );
     } catch (err: unknown) {
+      streamingMessageIdRef.current = null;
+      streamDoneRef.current = false;
+      pendingStreamRef.current = "";
+      stopTypingTimer();
+
       const errorMessage = err instanceof Error ? err.message : "An error occurred";
       setMessages((prev) =>
         prev.map((message) =>
@@ -197,6 +280,16 @@ export default function ChatInterface({ docId, filename, onSourceClick }: ChatIn
           </p>
         </div>
         <div style={{ marginLeft: "auto", display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <button
+            type="button"
+            onClick={onToggleViewer}
+            className="btn-secondary"
+            aria-pressed={isViewerVisible}
+            style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "6px 10px" }}
+          >
+            {isViewerVisible ? <EyeOff size={14} /> : <Eye size={14} />}
+            {isViewerVisible ? "Hide PDF viewer" : "Show PDF viewer"}
+          </button>
           <span className="badge badge-success">Active</span>
           <span className="badge badge-accent">Grounded</span>
         </div>
