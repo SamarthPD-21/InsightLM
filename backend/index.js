@@ -9,11 +9,30 @@ const app = express();
 const PORT = process.env.PORT || 8000;
 
 // Middleware
-app.use(cors({
-  origin: process.env.FRONTEND_URL || "http://localhost:3000",
-  methods: ["GET", "POST", "DELETE"],
-  credentials: true
-}));
+const rawAllowedOrigins = process.env.FRONTEND_URL
+  ? process.env.FRONTEND_URL.split(",")
+  : ["http://localhost:3000"];
+
+const allowedOrigins = rawAllowedOrigins
+  .map((origin) => origin.trim())
+  .filter(Boolean)
+  .map((origin) =>
+    origin.startsWith("http://") || origin.startsWith("https://")
+      ? origin
+      : `https://${origin}`
+  );
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, origin);
+      return callback(new Error("Not allowed by CORS"));
+    },
+    methods: ["GET", "POST", "DELETE"],
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 // Routes
