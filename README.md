@@ -1,128 +1,138 @@
 # InsightLM
 
-InsightLM is a document intelligence workspace: upload PDFs or text files, chat with grounded answers, and jump to cited pages in an in-app document viewer.
+InsightLM is a powerful document intelligence workspace inspired by NotebookLM. It allows you to upload PDFs or text files, chat with your documents to get grounded answers, and seamlessly jump to cited pages using an integrated in-app document viewer.
 
-## What you get
+![InsightLM](https://img.shields.io/badge/Status-Active-success)
+![License](https://img.shields.io/badge/License-MIT-blue)
 
-- **Grounded chat with citations** (page-level sources)
-- **Streaming responses** (SSE “letter-by-letter” feel)
-- **Side-by-side workspace**: chat (left) + document preview (right)
-- **Clickable citations**: jump the viewer to the referenced page
-- **Multi-document sidebar** (collapsible) + per-file viewer toggle
-- **PDF + TXT support**
+## ✨ Features
 
-## Architecture
+- **Grounded Chat with Citations**: Get accurate answers with page-level sources and direct quotes.
+- **Streaming Responses**: Enjoy a fast, "letter-by-letter" response stream via Server-Sent Events (SSE).
+- **Side-by-Side Workspace**: A highly productive layout with chat on the left and a document preview on the right.
+- **Clickable Citations**: Instantly jump the document viewer to the exact referenced page.
+- **Multi-Document Support**: Manage multiple documents via a collapsible sidebar and toggle between them.
+- **Format Support**: Upload and process both PDF and TXT files.
 
-```
-Next.js client (React 19)
-        └─ streams chat + renders markdown + document viewer
+## 🏗️ Architecture & Tech Stack
 
-Express API
-        ├─ /api/upload     (multer → parse → chunk → embed → store)
-        ├─ /api/chat       (RAG retrieve → grounded prompt → stream response)
-        ├─ /api/documents  (list/delete)
-        └─ /uploads/*      (serves original uploaded files for the viewer)
+InsightLM is built with a modern, decoupled architecture:
 
-Qdrant
-        └─ stores embeddings for retrieval
+### Client
+- **Framework**: Next.js (React 19)
+- **Styling**: Tailwind CSS
+- **Features**: Streams chat, renders markdown, embedded document viewer.
 
-Hugging Face Inference
-        ├─ embeddings: BAAI/bge-large-en-v1.5
-        └─ chat model: Qwen/Qwen2.5-7B-Instruct
-```
+### Backend
+- **Framework**: Express.js API
+- **Capabilities**: File parsing (multer), document chunking, embeddings generation, RAG retrieval.
+- **Vector Database**: Qdrant (stores high-dimensional embeddings for fast retrieval).
 
-## Project structure
+### AI Models (Hugging Face Inference)
+- **Embeddings**: `BAAI/bge-large-en-v1.5`
+- **Chat Model**: `Qwen/Qwen2.5-7B-Instruct`
 
-```
+## 📂 Project Structure
+
+```text
 backend/
-        index.js
-        routes/ (upload, chat, documents)
-        services/ (ragService, embeddingService, pdfService)
-        utils/ (chunking, promptTemplates, fileUtils)
+├── index.js             # Entry point
+├── routes/              # API endpoints (upload, chat, documents)
+├── services/            # Core logic (ragService, embeddingService, pdfService)
+└── utils/               # Helpers (chunking, promptTemplates, fileUtils)
 
 client/
-        app/ (layout, page, globals)
-        components/ (Sidebar, FileUpload, ChatInterface, DocumentViewer, SourceCitation)
-        lib/ (api client + types)
+├── app/                 # Next.js app router (layout, page, globals)
+├── components/          # UI Components (Sidebar, FileUpload, ChatInterface, DocumentViewer)
+└── lib/                 # API client and types
 ```
 
-## Getting started (local)
+## 🚀 Getting Started (Local Development)
 
 ### Prerequisites
 
 - Node.js 18+
-- Docker (for Qdrant)
-- A Hugging Face token with Inference access
+- Docker (for running Qdrant locally)
+- A Hugging Face token with Inference API access
 
-### 1) Start Qdrant
+### 1) Start Qdrant Vector DB
+
+Run Qdrant using Docker:
 
 ```bash
 docker run -p 6333:6333 qdrant/qdrant
 ```
 
-### 2) Backend
+### 2) Setup & Run Backend
 
 ```bash
 cd backend
 npm install
+```
 
-# Create backend/.env
-cat > .env <<'EOF'
-HF_TOKEN=YOUR_HF_TOKEN
+Create a `.env` file in the `backend/` directory:
+
+```env
+HF_TOKEN=your_hugging_face_token_here
 QDRANT_URL=http://localhost:6333
 QDRANT_COLLECTION_NAME=insightlm-docs
 FRONTEND_URL=http://localhost:3000
-EOF
-
-npm run dev
+PORT=8000
 ```
 
-Backend runs at `http://localhost:8000`.
+Start the backend development server:
 
-### 3) Client
+```bash
+npm run dev
+```
+The backend will be running at `http://localhost:8000`.
+
+### 3) Setup & Run Client
 
 ```bash
 cd client
 npm install
+```
 
-# Optional (defaults to http://localhost:8000/api)
-export NEXT_PUBLIC_API_URL=http://localhost:8000/api
+Start the frontend development server:
 
+```bash
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+The application will be accessible at `http://localhost:3000`.
 
-## Environment variables
+## ⚙️ Environment Variables
 
 ### Backend (`backend/.env`)
 
 | Variable | Required | Description |
-|---|---:|---|
-| `HF_TOKEN` | ✅ | Hugging Face token used for embeddings + chat inference |
+|---|:---:|---|
+| `HF_TOKEN` | ✅ | Hugging Face token for embeddings and chat inference |
 | `QDRANT_URL` | ✅ | Qdrant URL (local default `http://localhost:6333`) |
-| `QDRANT_API_KEY` | ❌ | Set if using Qdrant Cloud / protected instance |
-| `QDRANT_COLLECTION_NAME` | ❌ | Collection name (default `notebooklm-docs` in code) |
+| `QDRANT_API_KEY` | ❌ | Set if using a protected Qdrant instance |
+| `QDRANT_COLLECTION_NAME`| ❌ | Collection name (default `notebooklm-docs`) |
 | `PORT` | ❌ | Express port (default `8000`) |
-| `FRONTEND_URL` | ❌ | CORS origin (default `http://localhost:3000`) |
+| `FRONTEND_URL` | ❌ | CORS allowed origin (default `http://localhost:3000`) |
 
 ### Client
 
 | Variable | Required | Description |
-|---|---:|---|
-| `NEXT_PUBLIC_API_URL` | ❌ | Backend API base (default `http://localhost:8000/api`) |
+|---|:---:|---|
+| `NEXT_PUBLIC_API_URL` | ❌ | Backend API base URL (default `http://localhost:8000/api`) |
 
-## Notes / limitations
-
-- The backend uses an **in-memory document store**. If the server restarts, the document list resets (Qdrant vectors and uploaded files may still exist).
-- Uploaded source files are served from `backend/uploads` via `GET /uploads/*` so the in-app viewer can render them.
-
-## API (quick reference)
+## 📡 API Endpoints
 
 | Method | Endpoint | Purpose |
 |---|---|---|
-| `POST` | `/api/upload` | Upload + index PDF/TXT |
-| `POST` | `/api/chat` | Ask a question (supports streaming) |
-| `GET` | `/api/documents` | List documents |
-| `DELETE` | `/api/documents/:id` | Delete document (vectors + file) |
-| `GET` | `/api/health` | Health check |
+| `POST` | `/api/upload` | Upload and index a PDF/TXT document |
+| `POST` | `/api/chat` | Ask a question (supports SSE streaming) |
+| `GET` | `/api/documents` | List all uploaded documents |
+| `GET` | `/api/documents/:id/file` | Stream an uploaded document's raw file |
+| `DELETE` | `/api/documents/:id` | Delete a document and its vectors |
+| `GET` | `/api/health` | Backend health check |
+
+## ⚠️ Notes & Limitations
+
+- **In-Memory Document Store**: The backend currently uses an in-memory map for the document list (`documentStore`) and file buffers. If the server restarts, the document list in the UI will reset, although vectors in Qdrant will persist.
+- **File Serving**: Uploaded source files are served directly from memory via `GET /api/documents/:id/file` for rendering in the client-side document viewer.
