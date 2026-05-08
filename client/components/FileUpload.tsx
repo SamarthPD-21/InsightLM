@@ -28,8 +28,9 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
       if (!file) return;
 
       // Validate
-      if (!file.name.endsWith(".pdf") && !file.name.endsWith(".txt")) {
-        setError("Only PDF and TXT files are supported");
+      const lowerName = file.name.toLowerCase();
+      if (!lowerName.endsWith(".pdf") && !lowerName.endsWith(".txt") && !lowerName.endsWith(".csv") && !lowerName.endsWith(".json")) {
+        setError("Only PDF, TXT, CSV, and JSON files are supported");
         return;
       }
 
@@ -101,6 +102,8 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
     accept: {
       "application/pdf": [".pdf"],
       "text/plain": [".txt"],
+      "text/csv": [".csv"],
+      "application/json": [".json"],
     },
     maxFiles: 1,
     disabled: uploading,
@@ -195,6 +198,8 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
               <div style={{ display: "flex", gap: "8px", justifyContent: "center", flexWrap: "wrap" }}>
                 <span className="badge badge-accent"><FileText size={12} /> PDF</span>
                 <span className="badge badge-accent"><FileText size={12} /> TXT</span>
+                <span className="badge badge-accent"><FileText size={12} /> CSV</span>
+                <span className="badge badge-accent"><FileText size={12} /> JSON</span>
                 <span style={{ color: "var(--text-muted)", fontSize: "12px", alignSelf: "center" }}>Max 20MB</span>
               </div>
             </>

@@ -10,10 +10,20 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 }, // 20MB max
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === "application/pdf" || file.mimetype === "text/plain") {
+    const allowedTypes = [
+      "application/pdf",
+      "text/plain",
+      "text/csv",
+      "application/csv",
+      "application/vnd.ms-excel",
+      "application/json",
+      "text/json",
+    ];
+
+    if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error("Only PDF and TXT files are allowed"), false);
+      cb(new Error("Only PDF, TXT, CSV, and JSON files are allowed"), false);
     }
   },
 });

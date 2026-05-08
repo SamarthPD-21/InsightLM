@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight, ExternalLink, FileText } from "lucide-react";
 import { resolveFileUrl, type DocumentInfo } from "@/lib/api";
 
@@ -12,16 +12,59 @@ interface DocumentViewerProps {
 
 export default function DocumentViewer({ document, pageNumber, onPageChange }: DocumentViewerProps) {
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
+  const [dataUrl, setDataUrl] = useState<string | null>(null);
 
-  const isTextFile = document.mimeType === "text/plain";
+  const isTextFile =
+    document.mimeType === "text/plain" ||
+    document.mimeType === "text/csv" ||
+    document.mimeType === "application/csv" ||
+    document.mimeType === "application/vnd.ms-excel" ||
+    document.mimeType === "application/json" ||
+    document.mimeType === "text/json";
   const isPdf = !isTextFile;
   const resolvedUrl = resolveFileUrl(document.fileUrl);
   const safePageNumber = Math.max(1, pageNumber || 1);
 
+  // Fetch text files and convert to data URLs to prevent downloads
+  useEffect(() => {
+    if (!isTextFile || !resolvedUrl) {
+      setDataUrl(null);
+      return;
+    }
+
+    let objectUrl: string | null = null;
+    let isMounted = true;
+
+    const fetchAndConvert = async () => {
+      try {
+        const response = await fetch(resolvedUrl);
+        const blob = await response.blob();
+        objectUrl = URL.createObjectURL(
+          new Blob([blob], { type: "text/plain" })
+        );
+        if (isMounted) {
+          setDataUrl(objectUrl);
+        }
+      } catch (error) {
+        console.error("Failed to load text file:", error);
+      }
+    };
+
+    fetchAndConvert();
+
+    return () => {
+      isMounted = false;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [isTextFile, resolvedUrl]);
+
   const viewerSrc = useMemo(() => {
     if (!resolvedUrl) return "";
+    if (isTextFile && dataUrl) return dataUrl;
     return isPdf ? `${resolvedUrl}#page=${safePageNumber}&view=FitH` : resolvedUrl;
-  }, [isPdf, resolvedUrl, safePageNumber]);
+  }, [isPdf, resolvedUrl, safePageNumber, isTextFile, dataUrl]);
 
   const isLoaded = Boolean(viewerSrc) && loadedSrc === viewerSrc;
 

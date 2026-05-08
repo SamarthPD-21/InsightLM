@@ -9,12 +9,39 @@ import { extname } from "path";
  * @returns {Array} Array of document objects with text and metadata
  */
 export async function loadDocument(fileBuffer, originalName, mimeType) {
-  const isTextFile = mimeType === "text/plain" || extname(originalName).toLowerCase() === ".txt";
+  const lowerName = originalName.toLowerCase();
+  const isJson = mimeType === "application/json" || mimeType === "text/json" || lowerName.endsWith(".json");
+  const isCsv =
+    mimeType === "text/csv" ||
+    mimeType === "application/csv" ||
+    mimeType === "application/vnd.ms-excel" ||
+    lowerName.endsWith(".csv");
+  const isTextFile = mimeType === "text/plain" || lowerName.endsWith(".txt") || isJson || isCsv;
 
   if (isTextFile) {
-    const text = fileBuffer.toString("utf8");
+    const rawText = fileBuffer.toString("utf8");
+    let text = rawText;
+    let sourceType = "text";
 
-    console.log(`📄 Loaded text file: 1 page extracted`);
+    if (isJson) {
+      sourceType = "json";
+      try {
+        const parsed = JSON.parse(rawText);
+        text = JSON.stringify(parsed, null, 2);
+      } catch {
+        text = rawText;
+      }
+    } else if (isCsv) {
+      sourceType = "csv";
+      const rows = rawText
+        .replace(/\r\n/g, "\n")
+        .split("\n")
+        .filter((line) => line.trim().length > 0)
+        .map((line) => line.split(",").map((cell) => cell.trim()));
+      text = rows.map((cells) => cells.join(" | ")).join("\n");
+    }
+
+    console.log(`📄 Loaded ${sourceType} file: 1 page extracted`);
 
     return [
       {
@@ -22,7 +49,7 @@ export async function loadDocument(fileBuffer, originalName, mimeType) {
         metadata: {
           loc: { pageNumber: 0 },
           page: 0,
-          sourceType: "text",
+          sourceType,
         },
       },
     ];
