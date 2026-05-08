@@ -1,27 +1,13 @@
 import { Router } from "express";
 import multer from "multer";
 import { v4 as uuidv4 } from "uuid";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
-import { unlinkSync } from "fs";
 import { loadDocument } from "../services/pdfService.js";
 import { chunkDocuments } from "../utils/chunking.js";
 import { storeEmbeddings } from "../services/embeddingService.js";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 const router = Router();
 
-// Configure multer for PDF uploads
-const storage = multer.diskStorage({
-  destination: join(__dirname, "..", "uploads"),
-  filename: (req, file, cb) => {
-    const uniqueName = `${Date.now()}-${file.originalname}`;
-    cb(null, uniqueName);
-  },
-});
-
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 }, // 20MB max
   fileFilter: (req, file, cb) => {
     if (file.mimetype === "application/pdf" || file.mimetype === "text/plain") {
@@ -35,6 +21,7 @@ const upload = multer({
 // In-memory document store (for tracking uploaded docs)
 // In production, use a proper database
 export const documentStore = new Map();
+export const documentFileStore = new Map();
 
 /**
  * POST /api/upload
@@ -49,16 +36,16 @@ router.post("/", upload.single("file"), async (req, res) => {
 
     const docId = uuidv4();
     const filename = req.file.originalname;
-    const filePath = req.file.path;
-    const fileUrl = `/uploads/${req.file.filename}`;
+    const fileBuffer = req.file.buffer;
     const mimeType = req.file.mimetype;
+    const fileUrl = `/api/documents/${docId}/file`;
 
     console.log(`\n📁 Processing: ${filename}`);
     console.log(`   Document ID: ${docId}`);
 
     // Step 1: Load PDF
     console.log("   Step 1/3: Loading PDF...");
-    const documents = await loadDocument(filePath, mimeType);
+    const documents = await loadDocument(fileBuffer, filename, mimeType);
 
     // Step 2: Chunk documents
     console.log("   Step 2/3: Chunking documents...");
@@ -79,7 +66,12 @@ router.post("/", upload.single("file"), async (req, res) => {
       fileSize: req.file.size,
       fileUrl,
       mimeType,
-      filePath,
+    });
+
+    documentFileStore.set(docId, {
+      buffer: fileBuffer,
+      mimeType,
+      filename,
     });
 
     console.log(`   ✅ Document processed successfully!\n`);
@@ -98,13 +90,6 @@ router.post("/", upload.single("file"), async (req, res) => {
     });
   } catch (error) {
     console.error("Upload error:", error);
-    if (req.file?.path) {
-      try {
-        unlinkSync(req.file.path);
-      } catch {
-        // Ignore cleanup failures for temp uploads.
-      }
-    }
     res.status(500).json({
       error: "Failed to process document",
       message: error.message,
