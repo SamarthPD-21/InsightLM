@@ -128,7 +128,6 @@ export default function Home() {
                     <BookOpen size={30} color="white" />
                   </div>
                   <div>
-                    <span className="badge badge-accent" style={{ marginBottom: "10px" }}>InsightLM</span>
                     <h3 style={{ fontSize: "clamp(34px, 6vw, 52px)", fontWeight: 800, lineHeight: 1.02, marginBottom: "10px" }}>
                       Upload a document.
                     </h3>
