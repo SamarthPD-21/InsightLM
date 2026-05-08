@@ -29,7 +29,17 @@ router.get("/:id/file", (req, res) => {
     return res.status(404).json({ error: "Document not found" });
   }
 
-  res.setHeader("Content-Type", file.mimeType);
+  // Serve text-based files (CSV, JSON) as text/plain for inline display
+  const mimeType = 
+    file.mimeType === "application/csv" ||
+    file.mimeType === "text/csv" ||
+    file.mimeType === "application/vnd.ms-excel" ||
+    file.mimeType === "application/json" ||
+    file.mimeType === "text/json"
+      ? "text/plain"
+      : file.mimeType;
+
+  res.setHeader("Content-Type", mimeType);
   res.setHeader("Content-Disposition", `inline; filename="${file.filename}"`);
   res.send(file.buffer);
 });
