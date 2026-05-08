@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { FileText, Trash2, BookOpen, Clock, Layers } from "lucide-react";
 import { type DocumentInfo, deleteDocument } from "@/lib/api";
 
@@ -19,14 +20,49 @@ export default function Sidebar({
   onDocumentDeleted,
   onNewUpload,
 }: SidebarProps) {
-  const handleDelete = async (e: React.MouseEvent, docId: string) => {
+  const [pendingDelete, setPendingDelete] = useState<DocumentInfo | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleDelete = (e: React.MouseEvent, doc: DocumentInfo) => {
     e.stopPropagation();
-    if (!confirm("Delete this document and its embeddings?")) return;
+    setPendingDelete(doc);
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDelete || isDeleting) return;
+    setIsDeleting(true);
     try {
-      await deleteDocument(docId);
-      onDocumentDeleted(docId);
+      await deleteDocument(pendingDelete.id);
+      onDocumentDeleted(pendingDelete.id);
+      setPendingDelete(null);
+      setToastMessage("Document deleted successfully");
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+      toastTimerRef.current = setTimeout(() => {
+        setToastMessage(null);
+        toastTimerRef.current = null;
+      }, 2200);
     } catch (err) {
       console.error("Delete failed:", err);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -133,7 +169,7 @@ export default function Sidebar({
               <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
                 <button
                   type="button"
-                  onClick={(e) => handleDelete(e, doc.id)}
+                  onClick={(e) => handleDelete(e, doc)}
                   aria-label="Delete document"
                   style={{
                     background: "none",
@@ -170,6 +206,113 @@ export default function Sidebar({
           Clean answers • Citations • Source-aware chat
         </p>
       </div>
+
+      {pendingDelete && isMounted &&
+        createPortal(
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="animate-fade-in"
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(8, 8, 12, 0.78)",
+              backdropFilter: "blur(4px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 9999,
+              padding: "24px",
+            }}
+            onClick={() => setPendingDelete(null)}
+          >
+            <div
+              className="hero-panel animate-fade-in-up"
+              style={{
+                width: "100%",
+                maxWidth: "420px",
+                padding: "20px",
+                border: "1px solid var(--border)",
+                boxShadow: "var(--shadow-lg)",
+                animationDelay: "0.05s",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 style={{ fontSize: "16px", fontWeight: 700, marginBottom: "8px" }}>
+                Delete document?
+              </h3>
+              <p style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "16px" }}>
+                This removes embeddings and the document from the session.
+              </p>
+              <div
+                style={{
+                  background: "var(--bg-tertiary)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "12px",
+                  padding: "10px 12px",
+                  fontSize: "13px",
+                  marginBottom: "16px",
+                  color: "var(--text-primary)",
+                }}
+              >
+                {pendingDelete.filename}
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setPendingDelete(null)}
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={confirmDelete}
+                  disabled={isDeleting}
+                  style={{ background: "var(--error)", borderColor: "var(--error)" }}
+                >
+                  {isDeleting ? "Deleting..." : "Delete"}
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {toastMessage && (
+        <div
+          className="animate-fade-in"
+          style={{
+            position: "fixed",
+            right: "24px",
+            bottom: "24px",
+            zIndex: 10000,
+            background: "var(--bg-card)",
+            border: "1px solid var(--border-accent)",
+            color: "var(--text-primary)",
+            padding: "12px 16px",
+            borderRadius: "12px",
+            boxShadow: "var(--shadow-md)",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            fontSize: "13px",
+          }}
+        >
+          <span
+            style={{
+              width: "8px",
+              height: "8px",
+              borderRadius: "999px",
+              background: "var(--success)",
+              boxShadow: "0 0 12px rgba(16, 185, 129, 0.5)",
+            }}
+          />
+          {toastMessage}
+        </div>
+      )}
     </div>
   );
 }
