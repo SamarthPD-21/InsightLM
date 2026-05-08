@@ -1,4 +1,4 @@
-import pdf from "pdf-parse";
+import pdfParse from "pdf-parse/lib/pdf-parse.js";
 import { extname } from "path";
 
 /**
@@ -30,7 +30,7 @@ export async function loadDocument(fileBuffer, originalName, mimeType) {
 
   const pages = [];
 
-  await pdf(fileBuffer, {
+  await pdfParse(fileBuffer, {
     pagerender: async (pageData) => {
       const textContent = await pageData.getTextContent();
       const pageText = textContent.items.map((item) => item.str).join(" ");
@@ -40,7 +40,7 @@ export async function loadDocument(fileBuffer, originalName, mimeType) {
   });
 
   if (pages.length === 0) {
-    const fallback = await pdf(fileBuffer);
+    const fallback = await pdfParse(fileBuffer);
     if (fallback.text?.trim()) {
       pages.push(fallback.text);
     }
